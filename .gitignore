@@ -140,4 +140,4 @@ scratch*
 
 logs/
 
-*pyc
+.pyc
