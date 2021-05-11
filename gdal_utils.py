@@ -4,16 +4,20 @@ with in memory writing ability.
 """
 
 import copy
-import os
+import fnmatch
 import glob
 import logging
+import os
 import posixpath
 from pathlib import Path, PurePath
+import re
+import shutil
 import subprocess
 from subprocess import PIPE
 import typing
 
 from osgeo import gdal, ogr, osr
+from tqdm import tqdm
 
 # from misc_utils.get_creds import get_creds
 # from misc_utils.logging_utils import create_logger
@@ -30,6 +34,13 @@ logger.addHandler(ch)
 
 ogr.UseExceptions()
 gdal.UseExceptions()
+
+# GDAL supported types, but we do not want to open
+SKIP_EXT = ['dbf', 'xml',  # .shp
+            'dat', 'ind', 'map',  # mapinfo
+           # 'xlsx', 'csv', 'txt', # text files
+            'zip']
+LAYERED_EXT = ['gdb', 'gpkg']
 
 
 def ogr_reproject(input_shp, to_sr, output_shp=None, in_mem=False):
@@ -263,7 +274,8 @@ def auto_detect_ogr_driver(ogr_ds, name_only=False):
         return driver
 
 
-def detect_ogr_driver(ogr_ds: str, name_only: bool = False) -> typing.Tuple[gdal.Driver, str]:
+def detect_ogr_driver(ogr_ds: str, name_only: bool = False,
+                      default_esri: bool = False) -> typing.Tuple[gdal.Driver, str]:
     """
     Autodetect the appropriate driver for an OGR datasource.
 
@@ -327,9 +339,12 @@ def detect_ogr_driver(ogr_ds: str, name_only: bool = False) -> typing.Tuple[gdal
         if drv_sfx in driver_lut.keys():
             driver = driver_lut[drv_sfx]
         else:
-            logger.warning("Unsupported driver extension {} "
-                           "Defaulting to 'ESRI Shapefile'".format(drv_sfx))
-            driver = driver_lut[SHP]
+            logger.warning("Unsupported driver extension {}".format(drv_sfx))
+            if default_esri:
+                logger.warning("Defaulting to 'ESRI Shapefile'")
+                driver = driver_lut[SHP]
+            else:
+                driver = None
 
     logger.debug('Driver autodetected: {}'.format(driver))
 
@@ -598,18 +613,18 @@ def get_raster_stats(raster, band_num=1):
     return stats
 
 
-def run_subprocess(command):
-    proc = subprocess.Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-    for line in iter(proc.stdout.readline, b''):
-        logger.info('(subprocess) {}'.format(line.decode()))
-    proc_err = ""
-    for line in iter(proc.stderr.readline, b''):
-        proc_err += line.decode()
-    if proc_err:
-        logger.info('(subprocess) {}'.format(proc_err))
-    output, error = proc.communicate()
-    logger.debug('Output: {}'.format(output.decode()))
-    logger.debug('Err: {}'.format(error.decode()))
+# def run_subprocess(command):
+#     proc = subprocess.Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
+#     for line in iter(proc.stdout.readline, b''):
+#         logger.info('(subprocess) {}'.format(line.decode()))
+#     proc_err = ""
+#     for line in iter(proc.stderr.readline, b''):
+#         proc_err += line.decode()
+#     if proc_err:
+#         logger.info('(subprocess) {}'.format(proc_err))
+#     output, error = proc.communicate()
+#     logger.debug('Output: {}'.format(output.decode()))
+#     logger.debug('Err: {}'.format(error.decode()))
 
 
 def rescale_raster(raster, out_raster, out_min=0, out_max=1):
@@ -733,3 +748,102 @@ def rasterize_shp2raster_extent(ogr_ds, gdal_ds,
     out_ds = None
 
     return out_path
+
+
+def generate_suffix_lut(supported_formats=None, all_exts=False):
+    """
+    Create a look-up table by extensions, including the driver object,
+    and whether it is a vector and/or raster driver. This is essentially
+    just reshaping gdals driver.GetMetadata() to be sorted by file
+    extension.
+    supported_formats: list
+        If provided, only drivers with ShortName's in this list
+        will be returned
+    all_exts: bool
+        If true, all extensions that have drivers associated will
+        be returned, otherwise, only those that are both openable
+        and associated directly with spatial data will be returned
+    Returns:
+        dict: Look-up table of format:
+        {ext: {DRIVER: [gdal driver],
+               VECTOR: bool,
+               RASTER: bool}}
+    """
+    # GDAL metadata keys
+    DCAP_OPEN = 'DCAP_OPEN'
+    DCAP_VECTOR = 'DCAP_VECTOR'
+    DCAP_RASTER = 'DCAP_RASTER'
+    DMD_EXTS = 'DMD_EXTENSIONS'
+    # Other constants
+    YES = 'YES'
+    DRIVER = 'DRIVER'
+    DRIVER_NAME = 'DRIVER_NAME'
+    VECTOR = 'VECTOR'
+    RASTER = 'RASTER'
+
+    # Create look-up table by extension
+    lut = {}
+    gdal_drivers = [gdal.GetDriver(i) for i in range(gdal.GetDriverCount())]
+    if supported_formats:
+        gdal_drivers = [drv for drv in gdal_drivers if drv.ShortName in supported_formats]
+    for driver in gdal_drivers:
+        openable = driver.GetMetadataItem(DCAP_OPEN)
+        if openable != YES and all_exts is False:
+            # The driver cannot open anything so skip it
+            # (legacy and unsupported formats)
+            continue
+        is_vector = driver.GetMetadataItem(DCAP_VECTOR) == YES
+        is_raster = driver.GetMetadataItem(DCAP_RASTER) == YES
+        exts = driver.GetMetadataItem(DMD_EXTS)
+        if exts:  # Not None or ''
+            exts = exts.split(' ')
+            for ext in exts:
+                if all_exts is False:
+                    if ext in SKIP_EXT:
+                        continue
+                lut[ext] = {DRIVER: driver,
+                            DRIVER_NAME: driver.ShortName,
+                            VECTOR: is_vector,
+                            RASTER: is_raster}
+
+    return lut
+
+
+def locate_spatial_files(source_dir, fmts=None, file_pattern=None):
+    ext_lut = generate_suffix_lut(supported_formats=fmts)
+    spatial_files = []
+    for root, dirs, files in os.walk(source_dir):
+        for d in dirs:
+            if Path(d).suffix.replace('.', '') in ext_lut.keys():
+                spatial_files.append(Path(root) / d)
+        for f in files:
+            if Path(f).suffix.replace('.', '') in ext_lut.keys():
+                spatial_files.append(Path(root) / f)
+    # Remove any directories named like '*.shp'...
+    spatial_files = [f for f in spatial_files
+                     if f.is_file()
+                     or f.suffix.replace('.', '') in LAYERED_EXT]
+    if file_pattern:
+        spatial_files = [f for f in spatial_files
+                         if fnmatch.fnmatch(f.name, file_pattern)]
+    logger.info(f'Located spatial files: {len(spatial_files)}')
+    return spatial_files
+
+
+def copy_spatial_files(source_dir, dest_dir, fmts=None, use_parent=False):
+    spatial_files = locate_spatial_files(source_dir=source_dir, fmts=fmts)
+    logger.info(f'Copying {len(spatial_files)} spatial files to {dest_dir}...')
+    for sf in tqdm(spatial_files):
+        aux_files = sf.parent.glob(f'{sf.stem}*')
+        for af in aux_files:
+            if not af.is_file():
+                continue
+            if af.suffix[1:] in SKIP_EXT:
+                continue
+            if use_parent:
+                df = Path(dest_dir) / f'{af.parent.stem}_{af.name}'
+            else:
+                df = Path(dest_dir) / af.name
+            if df.exists():
+                continue
+            shutil.copy2(af, df)

@@ -5,7 +5,6 @@ Created on Fri Jun 21 11:30:25 2019
 @author: disbr007
 """
 import copy
-import matplotlib.pyplot as plt
 import logging
 import numpy as np
 import os
@@ -16,9 +15,9 @@ import random
 import fiona
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import Point, LineString
 from shapely.ops import split
-# from scipy.sparse.csgraph import connected_components
+import shapely
 from tqdm import tqdm
 
 import multiprocessing
@@ -198,7 +197,6 @@ def grid_poly_row(row, nrows, ncols):
                 split_polygons.append(base)
                 break
         return split_polygons
-
 
     # Determine how many split lines
     num_row_split_pts = nrows - 1
@@ -443,9 +441,20 @@ def read_vec(vec_path: str, **kwargs) -> gpd.GeoDataFrame:
     Read any valid vector format into a GeoDataFrame
     """
     driver, layer = detect_ogr_driver(vec_path, name_only=True)
-    if layer is not None:
-        gdf = gpd.read_file(Path(vec_path).parent, layer=layer, driver=driver, **kwargs)
+    if driver:
+        if layer is not None:
+            gdf = gpd.read_file(Path(vec_path).parent, layer=layer, driver=driver, **kwargs)
+        else:
+            gdf = gpd.read_file(vec_path, driver=driver, **kwargs)
     else:
-        gdf = gpd.read_file(vec_path, driver=driver, **kwargs)
+        ext = Path(vec_path).suffix
+        if ext == '.feather':
+            gdf = gpd.read_feather(vec_path)
 
+    return gdf
+
+
+def drop_z_dimension(gdf: gpd.GeoDataFrame):
+    gdf.geometry = gdf.geometry.apply(
+        lambda x: shapely.wkb.loads(shapely.wkb.dumps(x, output_dimension=2)))
     return gdf
