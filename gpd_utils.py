@@ -11,6 +11,7 @@ import os
 import pathlib
 from pathlib import Path
 import random
+from typing import Union
 
 import fiona
 import geopandas as gpd
@@ -23,7 +24,7 @@ from tqdm import tqdm
 import multiprocessing
 
 # from misc_utils.logging_utils import create_logger
-from .gdal_utils import detect_ogr_driver
+from gdal_utils import detect_ogr_driver
 
 
 # Set up logger
@@ -457,4 +458,13 @@ def read_vec(vec_path: str, **kwargs) -> gpd.GeoDataFrame:
 def drop_z_dimension(gdf: gpd.GeoDataFrame):
     gdf.geometry = gdf.geometry.apply(
         lambda x: shapely.wkb.loads(shapely.wkb.dumps(x, output_dimension=2)))
+    return gdf
+
+def load_excel_points(excel_file: Union[str, Path],
+                      lat_col: str = 'Latitude',
+                      lon_col: str = 'Longitude') -> gpd.GeoDataFrame:
+    df = pd.read_excel(excel_file)
+    gdf = gpd.GeoDataFrame(df, 
+                           geometry=gpd.points_from_xy(df[lat_col], df[lon_col]),
+                           crs='epsg:4236')
     return gdf
