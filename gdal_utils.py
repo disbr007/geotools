@@ -38,6 +38,7 @@ gdal.UseExceptions()
 # GDAL supported types, but we do not want to open
 SKIP_EXT = ['dbf', 'xml',  # .shp
             'dat', 'ind', 'map',  # mapinfo
+            'pdf',
            # 'xlsx', 'csv', 'txt', # text files
             'zip']
 LAYERED_EXT = ['gdb', 'gpkg']
