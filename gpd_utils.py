@@ -24,7 +24,7 @@ from tqdm import tqdm
 import multiprocessing
 
 # from misc_utils.logging_utils import create_logger
-from gdal_utils import detect_ogr_driver
+from .gdal_utils import detect_ogr_driver
 
 
 # Set up logger
