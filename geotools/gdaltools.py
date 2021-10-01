@@ -1,31 +1,18 @@
-"""
-Reproject a shapfile -- copied directly from ogr-cookbook, coverted to function
-with in memory writing ability.
-"""
-
-import copy
 import fnmatch
-import glob
 import logging
 import os
 import posixpath
 from pathlib import Path, PurePath
-import re
 import shutil
-import subprocess
 from subprocess import PIPE
 import typing
 
 from osgeo import gdal, ogr, osr
 from tqdm import tqdm
 
-# from misc_utils.get_creds import get_creds
-# from misc_utils.logging_utils import create_logger
-
-
 # Set up logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -316,7 +303,7 @@ def detect_ogr_driver(ogr_ds: str, name_only: bool = False,
         SHP: 'ESRI Shapefile',
         GPKG: 'GPKG',
         GDB: gdb_driver
-                  }
+        }
     layer = None
 
     # Check if in-memory datasource
@@ -340,14 +327,14 @@ def detect_ogr_driver(ogr_ds: str, name_only: bool = False,
         if drv_sfx in driver_lut.keys():
             driver = driver_lut[drv_sfx]
         else:
-            logger.warning("Unsupported driver extension {}".format(drv_sfx))
+            logger.debug("Unsupported driver extension {}".format(drv_sfx))
             if default_esri:
                 logger.warning("Defaulting to 'ESRI Shapefile'")
                 driver = driver_lut[SHP]
             else:
                 driver = None
 
-    logger.debug('Driver autodetected: {}'.format(driver))
+    # logger.debug('Driver autodetected: {}'.format(driver))
 
     if not name_only:
         try:

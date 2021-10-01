@@ -11,25 +11,29 @@ import os
 import pathlib
 from pathlib import Path
 import random
-from typing import Union
+from typing import Union, List
 
+import esrijson
 import fiona
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
 from shapely.ops import split
+from shapely import wkt
 import shapely
 from tqdm import tqdm
 
-import multiprocessing
+from gdaltools import detect_ogr_driver, locate_spatial_files
 
-# from misc_utils.logging_utils import create_logger
-from .gdal_utils import detect_ogr_driver
-
+# # from misc_utils.logging_utils import create_logger
+# try:
+#     from .gdal_utils import 
+# except ImportError:
+#     from gdal_utils import detect_ogr_driver
 
 # Set up logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -45,6 +49,8 @@ GPKG = 'GPKG'
 OPEN_FILE_GDB = 'OpenFileGDB'
 FILE_GBD = 'FileGDB'
 
+JSON = 'JSON'
+GEOMETRY = 'geometry'
 
 def list_gdb_layers(gdb_path):
     """
@@ -412,16 +418,35 @@ def write_gdf(src_gdf, out_footprint, to_str_cols=None,
     if driver in [ESRI_SHAPEFILE, GEOJSON]:
         if driver == GEOJSON:
             if gdf.crs != 4326:
-                logger.warning('Attempting to write GeoDataFrame with non-WGS84 '
-                               'CRS to GeoJSON. Reprojecting to WGS84.')
+                logger.debug('Attempting to write GeoDataFrame with non-WGS84 '
+                             'CRS to GeoJSON. Reprojecting to WGS84.')
                 gdf = gdf.to_crs('epsg:4326')
         gdf.to_file(out_footprint, driver=driver, **kwargs)
-
     elif driver in [GPKG, OPEN_FILE_GDB, FILE_GBD]:
         gdf.to_file(str(out_footprint.parent), layer=layer, driver=driver, **kwargs)
-
+    elif out_footprint.suffix == '.feather':
+        gdf.to_feather(out_footprint)
     else:
         logger.error('Unsupported driver: {}'.format(driver))
+
+
+def merge_vec_dir(destination_dir):
+    logger.info(f'Merging vector files in {destination_dir}...')
+    # Get all files in out directory
+    all_files = locate_spatial_files(destination_dir)
+    logger.info(f'Spatial vector files found: {len(all_files)}')
+    if len(all_files) == 0:
+        logger.warning('No spatial files found to merge. Skipping.')
+        return
+    logger.info('Loading files...')
+    all_gdfs = []
+    for f in tqdm(all_files):
+        gdf = read_vec(f)
+        all_gdfs.append(gdf)
+    
+    logger.info('Merging...')    
+    merged = pd.concat(all_gdfs)
+    return merged
 
 
 # def dissolve_touching(gdf: gpd.GeoDataFrame):
@@ -460,11 +485,162 @@ def drop_z_dimension(gdf: gpd.GeoDataFrame):
         lambda x: shapely.wkb.loads(shapely.wkb.dumps(x, output_dimension=2)))
     return gdf
 
+
 def load_excel_points(excel_file: Union[str, Path],
                       lat_col: str = 'Latitude',
                       lon_col: str = 'Longitude') -> gpd.GeoDataFrame:
     df = pd.read_excel(excel_file)
     gdf = gpd.GeoDataFrame(df, 
-                           geometry=gpd.points_from_xy(df[lat_col], df[lon_col]),
+                           geometry=gpd.points_from_xy(df[lon_col], df[lat_col]),
                            crs='epsg:4236')
     return gdf
+
+
+def create_geometry_from_cols(gdf: gpd.GeoDataFrame, lat_col: str = None, lon_col: str = None,
+                              wkt_col: str = None,
+                              epsg: str = '4326')-> pd.Series:
+    if lat_col and lon_col:
+        gdf[GEOMETRY] = gdf.apply(lambda x: Point(x[lon_col], x[lat_col]), axis=1)
+    elif wkt_col:
+        gdf[GEOMETRY] = gdf.apply(lambda x: wkt.loads(x[wkt_col]), axis=1)
+    
+    gdf = gpd.GeoDataFrame(gdf, geometry=GEOMETRY, crs=f'epsg:{epsg}')
+    
+    return gdf
+
+
+def geom2multi(geometry):
+    multi_lut = {
+        'Point': MultiPoint,
+        'Polygon': MultiPolygon,
+        'LineString': MultiLineString
+    }
+    
+    multi_type = multi_lut[geometry.geom_type]
+    
+    multi_geom = multi_type([geometry])
+    
+    return multi_geom
+
+
+def clean_feature_coords(content):
+    """
+    Cleans geometry coordinates recursively from a MapServer
+    response.
+    """
+    def clean_coords(item):
+        if isinstance(item[0], list):
+            return [clean_coords(x) for x in item]
+        else:
+            return item[0:2]
+
+    # Get all features
+    features = content['features']
+    cleaned_features = []
+    for feat in features:
+        coords = feat['geometry']['coordinates']
+        cleaned_coords = clean_coords(coords)
+        feat['geometry']['coordinates'] = cleaned_coords
+        cleaned_features.append(feat)
+        
+    content['features'] = cleaned_features
+    return content
+
+
+def esri2gdf(features):
+    rows = []
+    skipped_rows = 0
+    for f in features:
+        attributes = f['attributes']
+        try:
+            geometry = esrijson.to_shape(f['geometry'])
+            attributes.update({'geometry': geometry})
+            rows.append(attributes)
+        except ValueError as e:
+            logger.error(f'Error creating geometry. Skipping feature: {f["attributes"]}')
+            skipped_rows += 1
+            # raise e
+    if skipped_rows > 0:
+        logger.error(f'Skipped rows due to bad geometry: {skipped_rows}')
+    gdf = gpd.GeoDataFrame(rows)
+    return gdf
+
+
+def esri2geojson(features):
+    gdf = esri2gdf(features)
+    geojson = gdf.to_json()
+    return geojson
+
+
+
+def create_gdf_from_features(features: dict, epsg: int,
+                             type_mapping: dict = None,
+                             rename_cols: dict = None,
+                             lower_columns: bool = False,
+                             geometry_column: str = None,
+                             drop_cols: list = None,
+                             to_epsg: int = None,
+                             features_format: str = GEOJSON) -> gpd.GeoDataFrame:
+    """
+    Creates a geodatafrmae from a json response.
+    Args:
+        features: dict, json
+            json response from server
+        epsg: int
+            EPSG code to use with alyer
+        type_mapping: dict
+            Optional column:type mapping to change
+            column types
+        drop_cols:
+            Optional list of columns to drop before
+            writing to file.
+    Returns:
+        gpd.GeoDataFrame
+    """
+    if features_format == GEOJSON:
+        try:
+            features = clean_feature_coords(features)
+            gdf = gpd.GeoDataFrame.from_features(features)
+        except TypeError as e:
+            logger.error(e)
+            logger.error(f'Features type: {type(features)}')
+    elif features_format == JSON:
+        try:
+            gdf = esri2gdf(features)
+        except Exception as e:
+            logger.error('Error creating GeoDataFrame from JSON features.')
+            logger.error(e)
+    
+    if type_mapping:
+        for col, col_type in type_mapping.items():
+            gdf[col] = gdf[col].astype(col_type)
+    if rename_cols:
+        gdf.rename(columns=rename_cols, inplace=True)
+    if drop_cols:
+        gdf.drop(columns=drop_cols, inplace=True)
+    if lower_columns:
+        gdf.rename(columns={c: c.lower() for c in gdf.columns}, inplace=True)
+    if geometry_column:
+        gdf.set_geometry(geometry_column, inplace=True)
+    gdf.crs = 'epsg:{}'.format(epsg)
+    if to_epsg:
+        gdf.to_crs(epsg=to_epsg, inplace=True)
+
+    return gdf
+
+
+def combine_geojson(feats: List[dict]) -> dict:
+    """
+    Combines responses of geojson feature into a single
+    geojson object.
+    Args:
+        feats: list
+            List of feature responses (dicts) to combine
+
+    Returns:
+        dict: single dictionary in geojson format
+    """
+    base_feat = feats[0]
+    for f in feats[1:]:
+        base_feat['features'].extend(f['features'])
+    return base_feat

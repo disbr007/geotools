@@ -1,0 +1,13 @@
+fiona
+gdal
+geoalchemy2
+geopandas
+geos
+geotiff
+numpy
+pandas
+rasterio
+rtree
+scipy
+setuptools
+shapely
