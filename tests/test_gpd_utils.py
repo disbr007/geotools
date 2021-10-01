@@ -7,7 +7,7 @@ import os
 import geopandas as gpd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from gpd_utils import esri2gdf
+from geotools.gpdtools import esri2gdf
 
 ESRIJSON_EXAMPLE = r'/home/jeff/scratch/esrijson_example.json'
 

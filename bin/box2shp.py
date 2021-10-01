@@ -13,7 +13,7 @@ box_geom = box(float(minx), float(miny), float(maxx), float(maxy))
 
 gdf = gpd.GeoDataFrame(geometry=[box_geom], crs=f'epsg:{crs}')
 
-gdf.to_file(out_shp)
+# gdf.to_file(out_shp)
 
 
 

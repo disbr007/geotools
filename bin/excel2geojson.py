@@ -1,9 +1,9 @@
 import argparse
 import os
 
-from gpd_utils import load_excel_points
+from geotools.gpdtools import load_excel_points
 
-    
+
 def excel2geojson(excel_file, out_geojson=None, 
                   lat_col='Latitude',
                   lon_col='Longitude'):
