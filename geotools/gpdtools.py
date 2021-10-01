@@ -23,13 +23,8 @@ from shapely import wkt
 import shapely
 from tqdm import tqdm
 
-from gdaltools import detect_ogr_driver, locate_spatial_files
+from .gdaltools import detect_ogr_driver, locate_spatial_files
 
-# # from misc_utils.logging_utils import create_logger
-# try:
-#     from .gdal_utils import 
-# except ImportError:
-#     from gdal_utils import detect_ogr_driver
 
 # Set up logger
 logger = logging.getLogger(__name__)

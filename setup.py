@@ -9,7 +9,7 @@ with open("requirements.txt", "r") as fh:
     
 
 setuptools.setup(
-    name="geoutils",
+    name="geotools",
     version='0.1',
     author="Jeff Disbrow",
     author_email="disbr007@umn.edu",
