@@ -35,6 +35,8 @@ formatter = logging.Formatter(
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+logging.getLogger('aoetl.aolayers').setLevel(logging.DEBUG)
+
 
 # CONSTANTS
 # Drivers
@@ -552,8 +554,14 @@ def esri2gdf(features):
             attributes.update({'geometry': geometry})
             rows.append(attributes)
         except ValueError as e:
-            logger.error(f'Error creating geometry. Skipping feature: {f["attributes"]}')
-            skipped_rows += 1
+            try:
+                logger.debug('Issue creating geometry, attempting fixed function...')
+                geometry = fixed_create_multipolygon(f['geometry'])
+                attributes.update({'geometry': geometry})
+                rows.append(attributes)
+            except Exception as e:
+                logger.error('Error creating geometry, skipping feature: {e}')
+                skipped_rows += 1
             # raise e
     if skipped_rows > 0:
         logger.error(f'Skipped rows due to bad geometry: {skipped_rows}')
@@ -639,3 +647,27 @@ def combine_geojson(feats: List[dict]) -> dict:
     for f in feats[1:]:
         base_feat['features'].extend(f['features'])
     return base_feat
+
+
+def fixed_create_multipolygon(geometry):
+    """
+    This is copied directly from esrijson.geometry, but
+    fixes a bug where an Exception stating a exterior is missing
+    is raised if exterior is ccw (clockwise?).
+    """
+    rings = []
+    for poly in geometry['rings']:
+        exterior = None
+        interiors = []
+        p = Polygon(poly)
+        if p.exterior.is_ccw:
+            interiors.append(poly)
+            # This line is added to the function
+            exterior = p.exterior
+        else:
+            exterior = p.exterior
+        if exterior is None:
+            raise ValueError(
+                'Valid polygon types must at least define one exterior')
+        rings.append(Polygon(shell=exterior, holes=interiors))
+    return MultiPolygon(rings)

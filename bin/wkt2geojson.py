@@ -29,6 +29,7 @@ def geojson2wkt(geojson, wkt_out = None):
 def main(args):
     if args.input_wkt:
         if os.path.exists(args.input_wkt):
+            print('Found path to WKT file.')
             with open(args.input_wkt, 'r') as src:
                 input_wkt = src.read()
         else:
