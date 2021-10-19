@@ -554,6 +554,7 @@ def esri2gdf(features):
             attributes.update({'geometry': geometry})
             rows.append(attributes)
         except ValueError as e:
+            # Try using modified esritools.create_multipolyon
             try:
                 logger.debug('Issue creating geometry, attempting fixed function...')
                 geometry = fixed_create_multipolygon(f['geometry'])
