@@ -16,6 +16,7 @@ from typing import Union, List
 import esrijson
 import fiona
 import geopandas as gpd
+from osgeo import ogr
 import pandas as pd
 from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
 from shapely.ops import split
@@ -28,14 +29,13 @@ from .gdaltools import detect_ogr_driver, locate_spatial_files
 
 # Set up logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
-logging.getLogger('aoetl.aolayers').setLevel(logging.DEBUG)
+# logger.setLevel(logging.INFO)
+# ch = logging.StreamHandler()
+# formatter = logging.Formatter(
+#     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# ch.setFormatter(formatter)
+# logger.addHandler(ch)
+# logging.getLogger('aoetl.aolayers').setLevel(logging.DEBUG)
 
 
 # CONSTANTS
@@ -48,6 +48,9 @@ FILE_GBD = 'FileGDB'
 
 JSON = 'JSON'
 GEOMETRY = 'geometry'
+
+MULTI_GEOMS = [MultiPoint, MultiLineString, MultiPolygon]
+
 
 def list_gdb_layers(gdb_path):
     """
@@ -412,6 +415,7 @@ def write_gdf(src_gdf, out_footprint, to_str_cols=None,
                         and len(l) > 0 else '' for l in gdf[col]]
 
     # Write out in format specified
+    logger.info(f'Writing GeoDataFrame to file: {out_footprint}')
     if driver in [ESRI_SHAPEFILE, GEOJSON]:
         if driver == GEOJSON:
             if gdf.crs != 4326:
@@ -444,19 +448,6 @@ def merge_vec_dir(destination_dir):
     logger.info('Merging...')    
     merged = pd.concat(all_gdfs)
     return merged
-
-
-# def dissolve_touching(gdf: gpd.GeoDataFrame):
-#     dg = 'dissolve_group'
-#
-#     overlap_matrix = gdf.geometry.apply(
-#         lambda x: gdf.geometry.touches(x)).values.astype(int)
-#     n, ids = connected_components(overlap_matrix)
-#     gdf[dg] = ids
-#
-#     dissolved = gdf.dissolve(by=dg)
-#
-#     return dissolved
 
 
 def read_vec(vec_path: str, **kwargs) -> gpd.GeoDataFrame:
@@ -512,13 +503,35 @@ def geom2multi(geometry):
         'Polygon': MultiPolygon,
         'LineString': MultiLineString
     }
-    
-    multi_type = multi_lut[geometry.geom_type]
+    multi_type = multi_lut.get(geometry.geom_type, None)
+    if multi_type is None:
+        logger.debug(f'Skipping conversion to multi-geom, already multi: {geometry.geom_type}')
+        return geometry
     
     multi_geom = multi_type([geometry])
     
     return multi_geom
 
+
+def has_mixed_geoms(geometries):
+    geom_types = set([geom.geom_type for geom in geometries])
+    if len(geom_types) == 1:
+        has_mixed = False
+    else:
+        has_mixed = True
+        logger.debug('Found mixed geometries.')
+    return has_mixed
+    
+
+def gdf2multi(gdf):
+    mixed_geoms_found = has_mixed_geoms(gdf.geometry)
+    if mixed_geoms_found:
+        gdf.geometry = gdf.geometry.apply(lambda x: geom2multi(x))
+        still_mixed = has_mixed_geoms(gdf.geometry)
+        if still_mixed: 
+            logger.warning('Geometries still mixed after attempted converesion to Multi-geoms')
+    return gdf
+        
 
 def clean_feature_coords(content):
     """
@@ -574,7 +587,6 @@ def esri2geojson(features):
     gdf = esri2gdf(features)
     geojson = gdf.to_json()
     return geojson
-
 
 
 def create_gdf_from_features(features: dict, epsg: int,
@@ -672,3 +684,16 @@ def fixed_create_multipolygon(geometry):
                 'Valid polygon types must at least define one exterior')
         rings.append(Polygon(shell=exterior, holes=interiors))
     return MultiPolygon(rings)
+
+
+# def dissolve_touching(gdf: gpd.GeoDataFrame):
+#     dg = 'dissolve_group'
+#
+#     overlap_matrix = gdf.geometry.apply(
+#         lambda x: gdf.geometry.touches(x)).values.astype(int)
+#     n, ids = connected_components(overlap_matrix)
+#     gdf[dg] = ids
+#
+#     dissolved = gdf.dissolve(by=dg)
+#
+#     return dissolved

@@ -78,7 +78,8 @@ def ogr_reproject(input_shp, to_sr, output_shp=None, in_mem=False):
         output_shp = os.path.join('/vsimem', 'mem_lyr1.shp'.format(input_shp_name))
         # Convert windows path to unix path (required for gdal in-memory)
         output_shp = output_shp.replace(os.sep, posixpath.sep)
-
+    # elif output_shp is None:
+        
     # Check if output exists
     if os.path.exists(output_shp):
         logger.debug('Removing existing file: {}'.format(output_shp))
@@ -86,7 +87,7 @@ def ogr_reproject(input_shp, to_sr, output_shp=None, in_mem=False):
     if in_mem is True:
         outDataSet = driver.CreateDataSource(os.path.basename(output_shp).split('.')[0])
     else:
-        outDataSet = driver.CreateDataSource(os.path.dirname(output_shp))
+        outDataSet = driver.CreateDataSource(output_shp)
     # TODO: Support non-polygon input types
     output_shp_name = os.path.basename(output_shp).split('.')[0]
     outLayer = outDataSet.CreateLayer(output_shp_name, geom_type=ogr.wkbMultiPolygon)
@@ -365,12 +366,13 @@ def remove_shp(shp):
     """
     if shp:
         if os.path.exists(shp):
-            logger.debug('Removing shp: {}'.format(shp))
-            for ext in ['prj', 'dbf', 'shx', 'cpg', 'sbn', 'sbx']:
-                meta_file = shp.replace('shp', ext)
-                if os.path.exists(meta_file):
-                    logger.debug('Removing metadata file: {}'.format(meta_file))
-                    os.remove(meta_file)
+            if Path(shp).suffix.lower() == '.shp':
+                logger.debug('Removing file: {}'.format(shp))
+                for ext in ['prj', 'dbf', 'shx', 'cpg', 'sbn', 'sbx']:
+                    meta_file = shp.replace('shp', ext)
+                    if os.path.exists(meta_file):
+                        logger.debug('Removing metadata file: {}'.format(meta_file))
+                        os.remove(meta_file)
             os.remove(shp)
 
 
