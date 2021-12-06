@@ -773,10 +773,17 @@ def generate_suffix_lut(supported_formats=None, all_exts=False):
 
     # Create look-up table by extension
     lut = {}
+    # GDAL Drivers
     gdal_drivers = [gdal.GetDriver(i) for i in range(gdal.GetDriverCount())]
+    # OGR Drivers
+    ogr_drivers = [ogr.GetDriver(i) for i in range(ogr.GetDriverCount())]
+    
     if supported_formats:
         gdal_drivers = [drv for drv in gdal_drivers if drv.ShortName in supported_formats]
-    for driver in gdal_drivers:
+        ogr_drivers = [drv for drv in ogr_drivers if drv.GetName() in supported_formats]
+    
+    all_drivers = gdal_drivers + ogr_drivers
+    for driver in all_drivers:
         openable = driver.GetMetadataItem(DCAP_OPEN)
         if openable != YES and all_exts is False:
             # The driver cannot open anything so skip it
@@ -791,8 +798,9 @@ def generate_suffix_lut(supported_formats=None, all_exts=False):
                 if all_exts is False:
                     if ext in SKIP_EXT:
                         continue
+                drv_name = driver.ShortName if isinstance(driver, gdal.Driver) else driver.GetName()
                 lut[ext] = {DRIVER: driver,
-                            DRIVER_NAME: driver.ShortName,
+                            DRIVER_NAME: drv_name,
                             VECTOR: is_vector,
                             RASTER: is_raster}
 
@@ -804,10 +812,10 @@ def locate_spatial_files(source_dir, fmts=None, file_pattern=None):
     spatial_files = []
     for root, dirs, files in os.walk(source_dir):
         for d in dirs:
-            if Path(d).suffix.replace('.', '') in ext_lut.keys():
+            if Path(d).suffix.replace('.', '').lower() in ext_lut.keys():
                 spatial_files.append(Path(root) / d)
         for f in files:
-            if Path(f).suffix.replace('.', '') in ext_lut.keys():
+            if Path(f).suffix.replace('.', '').lower() in ext_lut.keys():
                 spatial_files.append(Path(root) / f)
     # Remove any directories named like '*.shp'...
     spatial_files = [f for f in spatial_files
