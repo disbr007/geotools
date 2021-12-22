@@ -25,7 +25,7 @@ import shapely
 from tqdm import tqdm
 
 from .gdaltools import detect_ogr_driver, locate_spatial_files
-
+from .shapelytools import point2square, densify_polygon, randomize_verticies
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -371,7 +371,10 @@ def write_gdf(src_gdf, out_footprint, to_str_cols=None,
     handling NaNs.
     date_format : str
         Use to convert datetime fields to string fields, using format provided
-    TODO: Add different handling for different formats, e.g. does gpkg allow datetime/NaN?
+    TODO: 
+    - Add different handling for different formats, e.g. does gpkg allow datetime/NaN?
+    - Add KML support fiona.supported_drivers['KML'] = 'rw'
+    
     """
     gdf = copy.deepcopy(src_gdf)
 
@@ -485,8 +488,15 @@ def load_excel_points(excel_file: Union[str, Path],
 
 
 def create_geometry_from_cols(gdf: gpd.GeoDataFrame, lat_col: str = None, lon_col: str = None,
-                              wkt_col: str = None,
+                              lat_lon_col: str=None, wkt_col: str = None,
                               epsg: str = '4326')-> pd.Series:
+    if lat_lon_col:
+        lat_lon_sep=','
+        gdf[GEOMETRY] = gdf[lat_lon_col].apply(
+            lambda x: Point(float(x.split(lat_lon_sep)[1].strip()),
+                            float(x.split(lat_lon_sep)[0].strip()) 
+                            )
+            )
     if lat_col and lon_col:
         gdf[GEOMETRY] = gdf.apply(lambda x: Point(x[lon_col], x[lat_col]), axis=1)
     elif wkt_col:
@@ -697,3 +707,42 @@ def fixed_create_multipolygon(geometry):
 #     dissolved = gdf.dissolve(by=dg)
 #
 #     return dissolved
+
+
+
+def generate_random_polygons(bounding_poly, n, randomize_distance, size_fluff=None,
+                             epsg=None, densify_percentage=None, simplify_tolerance=None):
+    # load an example polygons geodataframe
+    gdf_polys = gpd.read_file(bounding_poly)
+    gdf_polys.to_crs(epsg=epsg, inplace=True)
+
+    # find the bounds of your geodataframe
+    x_min, y_min, x_max, y_max = gdf_polys.total_bounds
+
+    gdf_points = gpd.GeoSeries()
+    enough_points = False
+    while not enough_points:
+        # generate random x, y values within the bounds
+        x = np.random.uniform(x_min, x_max, n)
+        y = np.random.uniform(y_min, y_max, n)
+
+        # convert them to a points GeoSeries
+        add_gdf_points = gpd.GeoSeries(gpd.points_from_xy(x, y)).set_crs(epsg=epsg)
+        
+        # only keep those points within polygons
+        add_gdf_points = add_gdf_points[add_gdf_points.intersects(gdf_polys.unary_union)]
+        
+        gdf_points = gdf_points.append(add_gdf_points)
+        enough_points = len(gdf_points) >= n
+
+    gdf_rect = gdf_points.apply(lambda x: point2square(x, n, size_fluff=size_fluff))
+    gdf_rect = gpd.GeoDataFrame({'geometry': gdf_rect, 'area': gdf_rect.apply(lambda x: x.area)})
+    if densify_percentage:
+        gdf_rect = gdf_rect.geometry.apply(lambda x: densify_polygon(x, densify_percentage))
+        
+    gdf_randomized = gdf_rect.apply(lambda x: randomize_verticies(x, randomize_distance))
+    
+    if simplify_tolerance:
+        gdf_randomized = gdf_randomized.geometry.apply(lambda x: x.simplify(simplify_tolerance))
+
+    return gdf_randomized

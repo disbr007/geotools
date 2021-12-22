@@ -219,7 +219,7 @@ def kmz2gdf(kmz: str, parse_style: bool = False) -> gpd.GeoDataFrame:
     if zipfile.is_zipfile(kmz):
         kml_data = read_kmz(kmz=kmz)
     else:
-        kml_data = read_kml(kml=kmz)
+        kml_data = read_kml(kml_file=kmz)
     
     kml_obj = kml.KML()
     kml_obj.from_string(kml_data)
