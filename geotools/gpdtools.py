@@ -710,7 +710,7 @@ def fixed_create_multipolygon(geometry):
 
 
 
-def generate_random_polygons(bounding_poly, n, randomize_distance, size_fluff=None,
+def generate_random_polygons(bounding_poly, n, randomize_distance, size, size_fluff=None,
                              epsg=None, densify_percentage=None, simplify_tolerance=None):
     # load an example polygons geodataframe
     gdf_polys = gpd.read_file(bounding_poly)
@@ -732,10 +732,15 @@ def generate_random_polygons(bounding_poly, n, randomize_distance, size_fluff=No
         # only keep those points within polygons
         add_gdf_points = add_gdf_points[add_gdf_points.intersects(gdf_polys.unary_union)]
         
+        # only keep up to n points
+        n_to_add = n - len(gdf_points)
+        add_gdf_points = add_gdf_points[:n_to_add]
+         
         gdf_points = gdf_points.append(add_gdf_points)
+        print(f'Total points created: {len(gdf_points)}')
         enough_points = len(gdf_points) >= n
 
-    gdf_rect = gdf_points.apply(lambda x: point2square(x, n, size_fluff=size_fluff))
+    gdf_rect = gdf_points.apply(lambda x: point2square(x, size=size, size_fluff=size_fluff))
     gdf_rect = gpd.GeoDataFrame({'geometry': gdf_rect, 'area': gdf_rect.apply(lambda x: x.area)})
     if densify_percentage:
         gdf_rect = gdf_rect.geometry.apply(lambda x: densify_polygon(x, densify_percentage))
