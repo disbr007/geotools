@@ -1,10 +1,20 @@
 import argparse
+import logging
 import os
 from pathlib import Path
 
 import fiona
 
 from geotools.gpdtools import generate_random_polygons
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 fiona.supported_drivers['KML'] = 'rw'
 fiona.supported_drivers['kml'] = 'rw'
@@ -27,34 +37,49 @@ if __name__ == '__main__':
                         help='Size of polygons to generate')
     parser.add_argument('--size_fluff', type=float,
                         help='Allow randomization of sizes up to this value')
-    parser.add_argument('--epsg')
+    parser.add_argument('--epsg_processing',
+                        help='The epsg to do processing, i.e. the epsg that specifieds '
+                        'the units to interpret arguments in.')
+    parser.add_argument('--epsg_out',
+                        help='The epsg to write the result as.')
     parser.add_argument('--densify_percentage', type=float,
                         help='Percentage by which to densify polygon verticies before randomizing.'
                              'This is helpful if a very simple polygon is passed, e.g. a square.')
     parser.add_argument('--simplify', type=float,
                         help='Distance allowed to simplify polygon.')
+    parser.add_argument('--use_centroids', action='store_true',
+                        help='Seed random polygons with centroids of bounding_polygons. If '
+                        'len(bounding_polygons) < n, random points will be added on top. If l'
+                        'len(bounding_polygons) > n, a random selection of n centroids will be used.')
     
     # DEBUGGING
     # import sys, shlex, os
-    # os.chdir(r'/home/jeff/ao/data/baa/debugging/2021dec23_flood')
-    # args_str = ('-i states_subset.shp -o random_in_states.kml -n 1000 -d 50 -s 250 --size_fluff 240 --epsg 2163 --densify_percentage 300 --simplify 50')
+    # os.chdir(r'/home/jeff/ao/data/baa/debugging/parcels')
+    # args_str = ('-i /home/jeff/data/gis/tiger_lines_2020/tl_2020_us_state/us_country.shp -o random_us_400_25_100_75.kml '
+    #             '-n 25 -s 100 --epsg_processing 2163 --epsg_out 4326 -d 25 --size_fluff 75 '
+    #             '--densify_percentage 250')
     # cli_args = shlex.split(args_str)
     # sys.argv = [__file__]
     # sys.argv.extend(cli_args)
 
     args = parser.parse_args()
     
-    random_polys = generate_random_polygons(bounding_poly = args.bounding_polygons,
+    logger.info('Generating random polygons...')
+    random_polys = generate_random_polygons(bounding_poly=args.bounding_polygons,
                                             n=args.number_polygons,
                                             randomize_distance=args.randomize_distance,
                                             size=args.size,
                                             size_fluff=args.size_fluff,
-                                            epsg=args.epsg,
+                                            epsg=args.epsg_processing,
                                             densify_percentage=args.densify_percentage,
-                                            simplify_tolerance=args.simplify)
+                                            simplify_tolerance=args.simplify,
+                                            start_with_centroids=args.use_centroids)
 
     if args.outfile:
         if Path(args.outfile).suffix.lower() == '.kml':
+            if args.epsg_out and args.epsg_out != '4326':
+                print(f'Warning, overriding --epsg_out ({args._epsg_out}) with '
+                      'KML standard: "4326"')
             # Use 4326
             random_polys = random_polys.to_crs(epsg='4326')
             # KML driver can't replace file
@@ -63,8 +88,12 @@ if __name__ == '__main__':
                 os.remove(args.outfile)
             driver = 'KML'
             random_polys.to_file(args.outfile, driver=driver)
+        if args.epsg_out:
+            random_polys.to_crs(epsg=args.epsg_out, inplace=True)
         random_polys.to_file(args.outfile)
         print(f'Writing to {args.outfile}')
+        
+    print('Done.')
 
         
         

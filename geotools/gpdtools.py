@@ -29,12 +29,12 @@ from .shapelytools import point2square, densify_polygon, randomize_verticies
 
 # Set up logger
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
-# ch = logging.StreamHandler()
-# formatter = logging.Formatter(
-#     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# ch.setFormatter(formatter)
-# logger.addHandler(ch)
+logger.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 # logging.getLogger('aoetl.aolayers').setLevel(logging.DEBUG)
 
 
@@ -711,20 +711,38 @@ def fixed_create_multipolygon(geometry):
 
 
 def generate_random_polygons(bounding_poly, n, randomize_distance, size, size_fluff=None,
-                             epsg=None, densify_percentage=None, simplify_tolerance=None):
+                             epsg=None, densify_percentage=None, simplify_tolerance=None,
+                             start_with_centroids=False):
+    logger.info('Generating random polygons...')
     # load an example polygons geodataframe
+    logger.info('Reading bounding polygons...')
     gdf_polys = gpd.read_file(bounding_poly)
-    gdf_polys.to_crs(epsg=epsg, inplace=True)
+    if epsg is not None:
+        gdf_polys.to_crs(epsg=epsg, inplace=True)
+    else:
+        epsg = gdf_polys.crs.to_epsg()
 
+    if start_with_centroids:
+        logger.info('Using centroids of polygons to seed points.')
+        gdf_points = gdf_polys.centroid
+        logger.info(f'Created {len(gdf_points)}')
+        if len(gdf_points) > n:
+            logger.info(f'Randomly selecting {n}...')
+            gdf_points = gdf_points.sample(n=n)
+    else:
+        gdf_points = gpd.GeoSeries()        
+        
     # find the bounds of your geodataframe
     x_min, y_min, x_max, y_max = gdf_polys.total_bounds
 
-    gdf_points = gpd.GeoSeries()
-    enough_points = False
+    # generate points
+    enough_points = len(gdf_points) >= n
+    gen_points = round(n + (n + n*0.5))
+    pbar = tqdm(total=n)
     while not enough_points:
         # generate random x, y values within the bounds
-        x = np.random.uniform(x_min, x_max, n)
-        y = np.random.uniform(y_min, y_max, n)
+        x = np.random.uniform(x_min, x_max, gen_points)
+        y = np.random.uniform(y_min, y_max, gen_points)
 
         # convert them to a points GeoSeries
         add_gdf_points = gpd.GeoSeries(gpd.points_from_xy(x, y)).set_crs(epsg=epsg)
@@ -737,17 +755,28 @@ def generate_random_polygons(bounding_poly, n, randomize_distance, size, size_fl
         add_gdf_points = add_gdf_points[:n_to_add]
          
         gdf_points = gdf_points.append(add_gdf_points)
-        print(f'Total points created: {len(gdf_points)}')
+        pbar.total = len(gdf_points)
+        logger.info(f'Total points created: {len(gdf_points)}')
+        
         enough_points = len(gdf_points) >= n
+        
+        if len(gdf_points) > n:
+            gdf_points = gdf_points.sample(n=n)
 
+    logger.info('Converting points to parcels...')
     gdf_rect = gdf_points.apply(lambda x: point2square(x, size=size, size_fluff=size_fluff))
     gdf_rect = gpd.GeoDataFrame({'geometry': gdf_rect, 'area': gdf_rect.apply(lambda x: x.area)})
     if densify_percentage:
-        gdf_rect = gdf_rect.geometry.apply(lambda x: densify_polygon(x, densify_percentage))
-        
-    gdf_randomized = gdf_rect.apply(lambda x: randomize_verticies(x, randomize_distance))
+        gdf_rect.geometry = gdf_rect.geometry.apply(lambda x: densify_polygon(x, densify_percentage))
     
-    if simplify_tolerance:
-        gdf_randomized = gdf_randomized.geometry.apply(lambda x: x.simplify(simplify_tolerance))
+    if randomize_distance:    
+        gdf_rect.geometry = gdf_rect.geometry.apply(
+            lambda x: randomize_verticies(x, randomize_distance))
 
-    return gdf_randomized
+    if simplify_tolerance:
+        gdf_rect = gdf_rect.geometry.apply(lambda x: x.simplify(simplify_tolerance))
+        
+    # Add index
+    gdf_rect['index'] = [i for i in range(len(gdf_rect))]
+
+    return gdf_rect

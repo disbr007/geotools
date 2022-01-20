@@ -12,7 +12,7 @@ WKT = 'wkt'
 
 def wkt2geojson(wkt_str, geojson_out, crs='epsg:4326'):
     print(f'Converting wkt to geojson: {geojson_out}')
-    # print(wkt_str)
+    print(wkt_str[0:100])
     geom = shapely.wkt.loads(wkt_str)
     gdf = gpd.GeoDataFrame({'id': [1],
                             'geometry': [geom]},

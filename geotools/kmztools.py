@@ -28,8 +28,8 @@ def loop_features(element: Union[kml.Document, kml.Placemark, kml.Folder],
                   folder_path: str) -> Generator:
     logger.debug(f'Iterating features in folder: {folder_path}')
     features = element.features()
-
-    for f in tqdm(features, desc='Iterating features'):
+    # for f in tqdm(features, desc='Iterating features'):
+    for f in features:
         if isinstance(f, Folder):
             for item in loop_features(f, folder_path+f.name+'/'):
                 yield item
@@ -44,7 +44,7 @@ def loop_features(element: Union[kml.Document, kml.Placemark, kml.Folder],
 
 
 def get_style_obj(style: kml.Style) -> dict:
-    logger.debug('Havestyle', style)
+    # logger.debug('Havestyle', style)
     obj = {}
     if hasattr(style, 'styles'):
         for s in style.styles():
@@ -112,6 +112,7 @@ def load_placemarks(kml_obj: kml.KML) -> Tuple[List[Dict], Dict]:
     styles = {}
     items = []
     for doc in kml_obj.features():
+        logger.debug(f'Parsing KML doc: {doc.name}')
         for style in doc.styles():
             styles[style.id] = style
 
@@ -212,7 +213,7 @@ def capture_style(placemark: kml.Placemark, styles: dict) -> dict:
     return style_obj
 
 
-def kmz2gdf(kmz: str, parse_style: bool = False) -> gpd.GeoDataFrame:
+def kmz2gdf(kmz: str, parse_style: bool = False, include_folder_path: bool = False) -> gpd.GeoDataFrame:
     logger.info('Parsing KMZ...')
 
     # Load KML data
@@ -227,13 +228,15 @@ def kmz2gdf(kmz: str, parse_style: bool = False) -> gpd.GeoDataFrame:
     placemarks, styles = load_placemarks(kml_obj)
 
     out_records = []
-    for i, item in tqdm(enumerate(placemarks), desc='Processing features', total=len(placemarks)):
+    for i, item in tqdm(enumerate(placemarks), desc='Processing KMZ features', 
+                        total=len(placemarks)):
         placemark = item['f']
         record = create_record(placemark)
 
         if parse_style:
             record['style'] = capture_style(placemark, styles)
-
+        if include_folder_path:
+            record['folder_path'] = item['folder']
         out_records.append(record)
         
     # Create GeoDataFrame
@@ -241,4 +244,14 @@ def kmz2gdf(kmz: str, parse_style: bool = False) -> gpd.GeoDataFrame:
     gdf = gpd.GeoDataFrame(out_records, geometry='geometry', crs='epsg:4326')
     
     return gdf
+
+
+def split_gdf_on_folder_path(gdf: gpd.GeoDataFrame, folder_path_field: str='folder_path') -> List[gpd.GeoDataFrame]:
+    new_gdfs = {}
+    unique_fps = gdf[folder_path_field].unique()
+    for uf in unique_fps:
+        subset = gdf[gdf[folder_path_field]==uf]
+        new_gdfs[Path(uf).stem] = subset
+    return new_gdfs
+
 

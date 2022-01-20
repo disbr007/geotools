@@ -19,7 +19,7 @@ setuptools.setup(
     url="https://github.com/disbr007/geotools.git",
     package_dir={"":"."},
     packages=setuptools.find_packages(),
-    py_modules=['gdaltools', 'gpdtools'],
+    py_modules=['gdaltools', 'gpdtools', 'kmztools', 'shapelytools'],
     install_requires=DEPENDENCIES,
     classifiers=[
         "Programming Language :: Python :: 3",
