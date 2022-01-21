@@ -6,7 +6,6 @@ with open("readme.md", "r") as fh:
 
 with open("requirements.txt", "r") as fh:
     DEPENDENCIES = fh.readlines()
-    
 
 setuptools.setup(
     name="geotools",
