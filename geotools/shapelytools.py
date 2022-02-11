@@ -1,6 +1,8 @@
+import math
 import operator
 import random
 
+import numpy as np
 import shapely
 from shapely.geometry import Point, Polygon
 
@@ -39,3 +41,45 @@ def randomize_verticies(polygon: Polygon, max_distance: float):
         randomized_poly = randomized_poly.buffer(0)
     
     return randomized_poly
+
+
+def create_grid_cell_size(cell_size, bounds):
+    xmin, ymin, xmax, ymax = bounds
+    xdist = xmax - xmin
+    ydist = ymax - ymin
+
+    num_x = math.ceil(xdist // cell_size) + 1
+    num_y = math.ceil(ydist // cell_size) + 1
+
+    grid_cells = []
+    x0 = xmin
+    y0 = ymin
+    for x_ct in range(num_x):
+        x1 = x0 + cell_size
+        for y_ct in range(num_y):
+            y1 = y0 + cell_size
+            grid_cells.append(shapely.geometry.box(x0, y0, x1, y1))
+            y0 = y1
+        x0 = x1
+        y0 = ymin
+
+    return grid_cells
+
+
+def create_grid_cell_count(n_cells, bounds):
+    xmin, ymin, xmax, ymax = bounds
+    
+    cell_size = (xmax-xmin)/n_cells
+
+    # create the cells in a loop with a one cell buffer above and below
+    grid_cells = []
+    # for x0 in tqdm(np.arange(xmin-cell_size, xmax+cell_size, cell_size)):
+    #     for y0 in np.arange(ymin-cell_size, ymax+cell_size, cell_size):
+    for x0 in np.arange(xmin, xmax, cell_size):
+        for y0 in np.arange(ymin, ymax, cell_size):
+            # bounds
+            x1 = x0-cell_size
+            y1 = y0+cell_size
+            grid_cells.append(shapely.geometry.box(x0, y0, x1, y1))
+
+    return grid_cells

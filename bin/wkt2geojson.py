@@ -22,7 +22,7 @@ def wkt2geojson(wkt_str, geojson_out, crs='epsg:4326'):
 
 def geojson2wkt(geojson, wkt_out = None):
     print(f'Converting {geojson} to wkt ({wkt_out})')
-    gdf = gpd.read_file(geojson, drive='GeoJSON')
+    gdf = gpd.read_file(geojson, driver='GeoJSON')
     wkts = gdf.geometry.to_wkt()
     if wkt_out:
         with open(wkt_out, 'w') as out:
@@ -37,7 +37,36 @@ def test_file2geojson(test_file, geojson_out):
         data = json.load(src)
     wkt = data[PARAMATER][LOCATION][WKT]
     wkt2geojson(wkt_str=wkt, geojson_out=geojson_out)
-        
+
+
+def aodrawing2geojson(drawing_file, out_dir):
+    print(f'Converting AO Drawing file to geojson: {drawing_file}')
+    with open(drawing_file, 'r') as src:
+        data = json.load(src)
+    HAZARDS = 'hazards'
+    BUILDABLE = 'buildable'
+    NAME = 'name'
+    ITEMS = 'items'
+    WKT = 'wkt'
+    
+    hazards = data[HAZARDS]
+    for haz in hazards:
+        if len(haz[ITEMS]) == 0:
+            print(f'No records for {haz[NAME]}')
+            continue
+        else:
+            out_name = os.path.join(out_dir, f'{haz[NAME]}.geojson')
+            gdf = gpd.GeoDataFrame(haz[ITEMS])
+            gdf['geometry'] = gdf[WKT].apply(lambda x: shapely.wkt.loads(x))
+            print(f'Writing {haz[NAME]} to file: {out_name}')
+            gdf.to_file(out_name, driver='GeoJSON')
+    # Buildable
+    buildable_gdf = gpd.GeoDataFrame(data[BUILDABLE][ITEMS])
+    buildable_gdf['geometry'] = buildable_gdf[WKT].apply(lambda x: shapely.wkt.loads(x))
+    out_name = os.path.join(out_dir, 'buildable.geojson')
+    print(f'Writing buildable to: {out_name}')
+    buildable_gdf.to_file(out_name, driver='GeoJSON')
+    
     
 def main(args):
     if args.input_wkt:
@@ -52,8 +81,11 @@ def main(args):
         geojson2wkt(args.input_geojson, args.out_wkt)
     if args.input_test_file:
         test_file2geojson(args.input_test_file, args.out_geojson)
-
+    if args.input_drawing_file:
+        out_dir = os.getcwd() if args.out_dir is None else args.out_dir
+        aodrawing2geojson(drawing_file=args.input_drawing_file, out_dir=out_dir)
         
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -64,6 +96,18 @@ if __name__ == '__main__':
     
     parser.add_argument('-wkt', '--input_wkt', type=str)
     parser.add_argument('-ow', '--out_wkt', type=os.path.abspath)
+    
+    parser.add_argument('-df', '--input_drawing_file', type=os.path.abspath)
+    parser.add_argument('--out_dir', type=os.path.abspath)
+    
+    
+    # import sys, shlex
+    # os.chdir(r'/home/jeff/ao_code/task-geoanalysis/tmp/work/geo/dash_mvb9gddudash_tfxsxzilbe')
+    # args_str = ('-df drawing_zWAmx.json --out_dir /home/jeff/scratch')
+    #             # '-ct substation')
+    # cli_args = shlex.split(args_str)
+    # sys.argv = [__file__]
+    # sys.argv.extend(cli_args)
     
     args = parser.parse_args()
     
