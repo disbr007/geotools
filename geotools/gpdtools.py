@@ -29,12 +29,12 @@ from .shapelytools import point2square, densify_polygon, randomize_verticies
 
 # Set up logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+# logger.setLevel(logging.INFO)
+# ch = logging.StreamHandler()
+# formatter = logging.Formatter(
+#     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# ch.setFormatter(formatter)
+# logger.addHandler(ch)
 # logging.getLogger('aoetl.aolayers').setLevel(logging.DEBUG)
 
 
@@ -174,7 +174,6 @@ def grid_poly(poly_gdf, nrows, ncols):
     return master_gdf
 
 
-## Function begins
 def grid_poly_row(row, nrows, ncols):
     '''
     Takes a geodataframe with Polygon geom and creates a grid of nrows and ncols in its bounding box
@@ -490,7 +489,9 @@ def load_excel_points(excel_file: Union[str, Path],
 def create_geometry_from_cols(gdf: gpd.GeoDataFrame, lat_col: str = None, lon_col: str = None,
                               lat_lon_col: str=None, wkt_col: str = None,
                               epsg: str = '4326')-> pd.Series:
+    starting_count = len(gdf)
     if lat_lon_col:
+        gdf = gdf[~gdf[lat_lon_col].isnull()]
         lat_lon_sep=','
         gdf[GEOMETRY] = gdf[lat_lon_col].apply(
             lambda x: Point(float(x.split(lat_lon_sep)[1].strip()),
@@ -498,12 +499,18 @@ def create_geometry_from_cols(gdf: gpd.GeoDataFrame, lat_col: str = None, lon_co
                             )
             )
     if lat_col and lon_col:
+        gdf = gdf[~gdf[lat_col].isnull()]
+        gdf = gdf[~gdf[lon_col].isnull()]
         gdf[GEOMETRY] = gdf.apply(lambda x: Point(x[lon_col], x[lat_col]), axis=1)
     elif wkt_col:
+        gdf = gdf[~gdf[wkt_col].isnull()]
         gdf[GEOMETRY] = gdf.apply(lambda x: wkt.loads(x[wkt_col]), axis=1)
     
     gdf = gpd.GeoDataFrame(gdf, geometry=GEOMETRY, crs=f'epsg:{epsg}')
     
+    if starting_count != len(gdf):
+        logger.warning(f'Records dropped while creating geometry (missing data): '
+                       f'{starting_count-len(gdf)}')
     return gdf
 
 
