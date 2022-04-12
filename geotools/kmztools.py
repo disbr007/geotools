@@ -149,7 +149,8 @@ def attributes_from_description(description: str) -> dict:
     """
     attributes = {}
     data = pd.read_html(description)
-    try:
+    if len(data) == 2:
+    # try:
         table = data[1]
         for _idx, row in table.iterrows():
             key = row[0]
@@ -158,7 +159,8 @@ def attributes_from_description(description: str) -> dict:
                 continue
             if value:
                 attributes[key] = value
-    except Exception as e:  # What exception(s) is being caught here?
+    # except Exception as e:  # What exception(s) is being caught here?
+    elif len(data) == 1:
         table = data[0]
         for _idx, row in table.iterrows():
             key = row[0]
@@ -169,8 +171,9 @@ def attributes_from_description(description: str) -> dict:
                 continue
             if value:
                 attributes[key] = value
-        logger.error('Error reading table for placemark')
-        logger.error(e)
+    else:
+        logger.error(f'Error reading table for placemark. Data: {data}')
+
     return attributes
 
 
@@ -255,3 +258,5 @@ def split_gdf_on_folder_path(gdf: gpd.GeoDataFrame, folder_path_field: str='fold
     return new_gdfs
 
 
+gdf = kmz2gdf('/home/jeff/ao/data/layers/2428_suncode_kmzs/20220107_KMZs/COMED/COMED_Greaterthan500MW.kmz')
+print(gdf)
