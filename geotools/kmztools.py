@@ -256,7 +256,3 @@ def split_gdf_on_folder_path(gdf: gpd.GeoDataFrame, folder_path_field: str='fold
         subset = gdf[gdf[folder_path_field]==uf]
         new_gdfs[Path(uf).stem] = subset
     return new_gdfs
-
-
-gdf = kmz2gdf('/home/jeff/ao/data/layers/2428_suncode_kmzs/20220107_KMZs/COMED/COMED_Greaterthan500MW.kmz')
-print(gdf)
