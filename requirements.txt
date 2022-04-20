@@ -5,7 +5,7 @@ geopandas
 geos
 geotiff
 numpy
-pandas
+pandas>=1.2
 rasterio
 rtree
 scipy
