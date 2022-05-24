@@ -76,3 +76,4 @@ if __name__ == '__main__':
     build_overviews(source_dir=args.source_dir,
                     ext=args.ext,
                     dryrun=args.dryrun)
+    logger.info('Done.')
