@@ -1,4 +1,3 @@
-import time
 import argparse
 import logging 
 from pathlib import Path
@@ -56,14 +55,12 @@ def build_overviews(source_dir, ext, dryrun=False):
             pbar.set_description(f'Processing {f.name} (statistics)')
             if not dryrun:
                 run_subprocess(stats_cmd)
-            time.sleep(0.25)
             pbar.update(1)
             # Create internal overviews
             overviews_cmd = f'gdaladdo -r nearest {str(f)}'
             pbar.set_description(f'Processing {f.name} (overviews) ')
             if not dryrun:
                 run_subprocess(overviews_cmd)
-            time.sleep(0.25)
             pbar.update(1)
     
     
