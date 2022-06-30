@@ -44,7 +44,7 @@ def get_files(source_dirs: list, ext) -> List[Path]:
     files = []
     for sd in source_dirs:
         sd_files = list(Path(sd).rglob(f'*{ext}'))
-        files.append(sd_files)
+        files.extend(sd_files)
     logger.info(f'Files found: {len(files)}')
     return files
 
