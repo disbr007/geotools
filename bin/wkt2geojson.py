@@ -76,7 +76,7 @@ def main(args):
                 input_wkt = src.read()
         else:
             input_wkt = args.input_wkt
-        wkt2geojson(input_wkt, args.out_geojson)
+        wkt2geojson(input_wkt, args.out_geojson, crs=args.wkt_crs)
     if args.input_geojson:
         geojson2wkt(args.input_geojson, args.out_wkt)
     if args.input_test_file:
@@ -98,6 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('-ow', '--out_wkt', type=os.path.abspath)
     
     parser.add_argument('-df', '--input_drawing_file', type=os.path.abspath)
+    
+    parser.add_argument('--wkt_crs')
     parser.add_argument('--out_dir', type=os.path.abspath)
     
     
