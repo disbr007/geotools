@@ -75,13 +75,15 @@ if __name__ == '__main__':
     
     parser.add_argument('--source_dir', nargs='+')
     parser.add_argument('--ext')
-    parser.add_argument('--stats')
-    parser.add_argument('--overviews')
+    parser.add_argument('--stats', action='store_true')
+    parser.add_argument('--overviews', action='store_true')
     parser.add_argument('--dryrun', action='store_true')
     
     args = parser.parse_args()
     
     build_overviews(source_dir=args.source_dir,
                     ext=args.ext,
+                    stats=args.stats,
+                    overviews=args.overviews,
                     dryrun=args.dryrun)
     logger.info('Done.')
