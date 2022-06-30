@@ -39,36 +39,44 @@ def run_subprocess(command, shell: bool = True):
     return proc_out, proc_err
 
 
-def get_files(source_dir, ext) -> List[Path]:
+def get_files(source_dirs: list, ext) -> List[Path]:
     # Get files matching extension
-    files = list(Path(source_dir).rglob(f'*{ext}'))
+    files = []
+    for sd in source_dirs:
+        sd_files = list(Path(sd).rglob(f'*{ext}'))
+        files.append(sd_files)
     logger.info(f'Files found: {len(files)}')
     return files
 
 
-def build_overviews(source_dir, ext, dryrun=False):
-    files = get_files(source_dir, ext)
-    with tqdm(total=len(files)*2) as pbar:
+def build_overviews(source_dirs, ext, stats=True, overviews=True, dryrun=False):
+    files = get_files(source_dirs, ext)
+    processes_per_file = sum([1 for each in [stats, overviews] if each is True])
+    with tqdm(total=len(files)*processes_per_file) as pbar:
         for f in files:
-            # Compute statistics
-            stats_cmd = f'gdalinfo -stats {str(f)}'
-            pbar.set_description(f'Processing {f.name} (statistics)')
-            if not dryrun:
-                run_subprocess(stats_cmd)
-            pbar.update(1)
-            # Create internal overviews
-            overviews_cmd = f'gdaladdo -r nearest {str(f)}'
-            pbar.set_description(f'Processing {f.name} (overviews) ')
-            if not dryrun:
-                run_subprocess(overviews_cmd)
-            pbar.update(1)
-    
+            if stats:
+                # Compute statistics
+                stats_cmd = f'gdalinfo -stats {str(f)}'
+                pbar.set_description(f'Processing {f.name} (statistics)')
+                if not dryrun:
+                    run_subprocess(stats_cmd)
+                pbar.update(1)
+            if overviews:
+                # Create internal overviews
+                overviews_cmd = f'gdaladdo -r nearest {str(f)}'
+                pbar.set_description(f'Processing {f.name} (overviews) ')
+                if not dryrun:
+                    run_subprocess(overviews_cmd)
+                pbar.update(1)
+
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--source_dir')
+    parser.add_argument('--source_dir', nargs='+')
     parser.add_argument('--ext')
+    parser.add_argument('--stats')
+    parser.add_argument('--overviews')
     parser.add_argument('--dryrun', action='store_true')
     
     args = parser.parse_args()
