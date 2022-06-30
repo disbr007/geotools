@@ -6,7 +6,7 @@ geos
 geotiff
 numpy
 pandas
-rasterio
+rasterio==1.3b1
 rtree
 scipy
 setuptools
