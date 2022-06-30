@@ -73,7 +73,8 @@ def build_overviews(source_dirs, ext, stats=True, overviews=True, dryrun=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--source_dir', nargs='+')
+    parser.add_argument('--source_dir', nargs='+', 
+                        help='Source directories to search for files in, can specify more than one.')
     parser.add_argument('--ext')
     parser.add_argument('--stats', action='store_true')
     parser.add_argument('--overviews', action='store_true')
@@ -81,7 +82,7 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
-    build_overviews(source_dir=args.source_dir,
+    build_overviews(source_dirs=args.source_dir,
                     ext=args.ext,
                     stats=args.stats,
                     overviews=args.overviews,
