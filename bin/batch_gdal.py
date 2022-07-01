@@ -83,7 +83,7 @@ def create_tiles(source_dirs: list,
     pbar = tqdm(total=sum([len(file_list) for file_list in sources_files.values()]))
     for source_dir, file_list in sources_files.items():
         for in_raster in file_list:
-            pbar.set_description(f'Creating overviews - {in_raster.name}')
+            pbar.set_description(f'Creating tiles - {in_raster.name}')
             out_raster = out_dir / in_raster.relative_to(source_dir)
             # Make any required directories
             out_raster.parent.mkdir(parents=True, exist_ok=True)
