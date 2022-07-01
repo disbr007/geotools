@@ -80,6 +80,7 @@ def batch_gdal(source_dirs: List[str],
                stats: bool = True,
                overviews: bool = True,
                tiles: bool = True,
+               out_tiles_dir: Optional[str] = None,
                dryrun: bool = False):
     files = get_files(source_dirs, ext)
     if stats:
@@ -87,7 +88,9 @@ def batch_gdal(source_dirs: List[str],
     if overviews:
         build_overviews(files, dryrun=dryrun)
     if tiles:
-        create_tiles(files, dryrun=dryrun)
+        if not out_tiles_dir:
+            raise argparse.ArgumentError('Must provide out_tiles_dir when creating tiles.')
+        create_tiles(files, out_dir=out_tiles_dir, dryrun=dryrun)
     logger.info('Done.')    
     
     
@@ -100,13 +103,20 @@ if __name__ == '__main__':
     parser.add_argument('--stats', action='store_true')
     parser.add_argument('--overviews', action='store_true')
     parser.add_argument('--tiles', action='store_true')
+    parser.add_argument('--out_tiles_dir',
+                        help='Path to write tiled rasters to - cannot be created in place.')
     parser.add_argument('--dryrun', action='store_true')
     
     args = parser.parse_args()
+    
+    # Validate arguments
+    if args.tiles and args.out_tiles_dir is None:
+        parser.error("--tiles requires --out_tiles_dir")
     
     batch_gdal(source_dirs=args.source_dir,
                ext=args.ext,
                stats=args.stats,
                overviews=args.overviews,
                tiles=args.tiles,
+               out_tiles_dir=args.out_tiles_dir,
                dryrun=args.dryrun)
