@@ -630,6 +630,13 @@ def create_gdf_from_features(features: dict, epsg: int,
     Returns:
         gpd.GeoDataFrame
     """
+    # Remove any null geometries
+    starting_count = len(features['features'])
+    features['features'] = [f for f in features['features'] if f['geometry'] is not None]
+    if len(features['features']) != starting_count:
+        logger.warning(f'Null features removed before conversion to GeoDataFrame: '
+                       f'{starting_count - len(features["features"])}'  )
+    # Convert to GeoDataFrame
     if features_format == GEOJSON:
         try:
             features = clean_feature_coords(features)
@@ -637,12 +644,14 @@ def create_gdf_from_features(features: dict, epsg: int,
         except TypeError as e:
             logger.error(e)
             logger.error(f'Features type: {type(features)}')
+            raise e
     elif features_format == JSON:
         try:
             gdf = esri2gdf(features)
         except Exception as e:
             logger.error('Error creating GeoDataFrame from JSON features.')
             logger.error(e)
+            raise e
     
     if type_mapping:
         for col, col_type in type_mapping.items():
@@ -741,6 +750,7 @@ def generate_random_polygons(bounding_poly, n, randomize_distance, size, size_fl
         
     # find the bounds of your geodataframe
     x_min, y_min, x_max, y_max = gdf_polys.total_bounds
+    logger.info(f'Bounds: {x_min}, {y_min}, {x_max}, {y_max}')
 
     # generate points
     enough_points = len(gdf_points) >= n

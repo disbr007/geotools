@@ -24,6 +24,8 @@ def densify_polygon(polygon: Polygon, densify_percent: float):
     coords = len(polygon.exterior.coords)
     addtl_points = round(coords * (densify_percent/100))
     interval = polygon.exterior.length / addtl_points
+    if addtl_points < 3:
+        addtl_points = 3
     new_points = [polygon.exterior.interpolate(interval*i) for i in range(addtl_points)]
     new_poly = Polygon(new_points)
     dense_poly = shapely.ops.unary_union([polygon, new_poly])
