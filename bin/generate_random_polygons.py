@@ -55,9 +55,14 @@ if __name__ == '__main__':
     # DEBUGGING
     # import sys, shlex, os
     # os.chdir(r'/home/jeff/ao/data/baa/debugging/parcels')
-    # args_str = ('-i /home/jeff/data/gis/tiger_lines_2020/tl_2020_us_state/us_country.shp -o random_us_400_25_100_75.kml '
-    #             '-n 25 -s 100 --epsg_processing 2163 --epsg_out 4326 -d 25 --size_fluff 75 '
-    #             '--densify_percentage 250')
+    # # # args_str = ('-i /home/jeff/data/gis/tiger_lines_2020/tl_2020_us_state/tl_2020_us_state.shp '
+    # # #             '-o /home/jeff/ao/data/baa/debugging/random_500_polys_in_states.kml '
+    # # #             '-n 250 -s 100 --epsg_processing 2163 --epsg_out 4326 -d 25 --size_fluff 75 '
+    # # #             '--densify_percentage 250')
+    # args_str = ('-i /home/jeff/data/gis/tiger_lines_2020/tl_2020_us_state/tl_2020_us_state_continental.shp '
+    #             '-o /home/jeff/ao/data/baa/debugging/random_200_polys_in_states.kml '
+    #             '-n 250 -s 500 --epsg_processing 3857 --epsg_out 4326 -d 10 '
+    #             '--densify_percentage 50')
     # cli_args = shlex.split(args_str)
     # sys.argv = [__file__]
     # sys.argv.extend(cli_args)
@@ -76,9 +81,10 @@ if __name__ == '__main__':
                                             start_with_centroids=args.use_centroids)
 
     if args.outfile:
+        driver = None
         if Path(args.outfile).suffix.lower() == '.kml':
             if args.epsg_out and args.epsg_out != '4326':
-                print(f'Warning, overriding --epsg_out ({args._epsg_out}) with '
+                print(f'Warning, overriding --epsg_out ({args.epsg_out}) with '
                       'KML standard: "4326"')
             # Use 4326
             random_polys = random_polys.to_crs(epsg='4326')
@@ -87,10 +93,10 @@ if __name__ == '__main__':
                 print('Replacing existing file...')
                 os.remove(args.outfile)
             driver = 'KML'
-            random_polys.to_file(args.outfile, driver=driver)
+            # random_polys.to_file(args.outfile, driver=driver)
         if args.epsg_out:
-            random_polys.to_crs(epsg=args.epsg_out, inplace=True)
-        random_polys.to_file(args.outfile)
+            random_polys = random_polys.to_crs(epsg=args.epsg_out)
+        random_polys.to_file(args.outfile, driver=driver)
         print(f'Writing to {args.outfile}')
         
     print('Done.')
