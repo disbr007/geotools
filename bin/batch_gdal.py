@@ -117,6 +117,7 @@ def batch_gdal(source_dirs: List[str],
                ext: str,
                stats: bool = True,
                overviews: bool = True,
+               resamp_alg: str = 'nearest',
                tiles: bool = True,
                out_tiles_dir: Optional[str] = None,
                dryrun: bool = False):
@@ -124,7 +125,7 @@ def batch_gdal(source_dirs: List[str],
     if stats:
         compute_statistics(files, dryrun=dryrun)
     if overviews:
-        build_overviews(files, dryrun=dryrun)
+        build_overviews(files, resamp_alg=resamp_alg, dryrun=dryrun)
     if tiles:
         if not out_tiles_dir:
             raise argparse.ArgumentError('Must provide out_tiles_dir when creating tiles.')
@@ -168,6 +169,7 @@ if __name__ == '__main__':
                ext=args.ext,
                stats=args.stats,
                overviews=args.overviews,
+               resamp_alg=args.overview_resampling_method,
                tiles=args.tiles,
                out_tiles_dir=args.out_tiles_dir,
                dryrun=args.dryrun)
