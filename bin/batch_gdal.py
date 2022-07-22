@@ -16,6 +16,19 @@ formatter = logging.Formatter(
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+RESAMPLING_CHOICES = [
+    'nearest',
+    'average',
+    'rms',
+    'bilinear',
+    'gauss',
+    'cubic',
+    'cubicspline',
+    'lanczos',
+    'average_magphase',
+    'mode'
+    ]
+
 
 def run_subprocess(command, shell: bool = True):
     logger.debug(f'Run subprocess: {command})')
@@ -62,10 +75,10 @@ def compute_statistics(files: List[Path], dryrun: bool = False):
             logger.debug(stats_cmd)
 
 
-def build_overviews(files: List[Path], dryrun=False):
+def build_overviews(files: List[Path], resamp_alg='nearest', dryrun=False):
     '''Create internal overviews'''
     for in_raster in (pbar := tqdm(files)):
-        overviews_cmd = f'gdaladdo -r nearest {str(in_raster)}'
+        overviews_cmd = f'gdaladdo -r {resamp_alg} {str(in_raster)}'
         pbar.set_description(f'Creating overviews - {in_raster.name}')
         if not dryrun:
             run_subprocess(overviews_cmd)
@@ -127,6 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--ext')
     parser.add_argument('--stats', action='store_true')
     parser.add_argument('--overviews', action='store_true')
+    parser.add_argument('-r', '--overview_resampling_method', choices=[RESAMPLING_CHOICES])
     parser.add_argument('--tiles', action='store_true')
     parser.add_argument('--out_tiles_dir',
                         help='Path to write tiled rasters to - cannot be created in place.')
