@@ -28,7 +28,7 @@ RESAMPLING_CHOICES = [
     'average_magphase',
     'mode'
     ]
-
+DEFAULT_LEVELS = [2 4 8 16 32 64 128 256 512 1024]
 
 def run_subprocess(command, shell: bool = True):
     logger.debug(f'Run subprocess: {command})')
@@ -75,10 +75,14 @@ def compute_statistics(files: List[Path], dryrun: bool = False):
             logger.debug(stats_cmd)
 
 
-def build_overviews(files: List[Path], resamp_alg='nearest', dryrun=False):
+def build_overviews(files: List[Path], 
+                    resamp_alg: str = 'nearest', 
+                    overview_levels: list = DEFAULT_LEVELS,
+                    dryrun: bool = False):
     '''Create internal overviews'''
+    overview_levels_str = ' '.join(overview_levels)
     for in_raster in (pbar := tqdm(files)):
-        overviews_cmd = f'gdaladdo -r {resamp_alg} {str(in_raster)}'
+        overviews_cmd = f'gdaladdo -r {resamp_alg} {str(in_raster)} {overview_levels_str}'
         pbar.set_description(f'Creating overviews - {in_raster.name}')
         if not dryrun:
             run_subprocess(overviews_cmd)
