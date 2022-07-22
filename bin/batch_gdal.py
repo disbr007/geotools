@@ -28,7 +28,7 @@ RESAMPLING_CHOICES = [
     'average_magphase',
     'mode'
     ]
-DEFAULT_LEVELS = [2 4 8 16 32 64 128 256 512 1024]
+DEFAULT_LEVELS = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 
 def run_subprocess(command, shell: bool = True):
     logger.debug(f'Run subprocess: {command})')
