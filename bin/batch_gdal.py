@@ -144,7 +144,7 @@ if __name__ == '__main__':
     parser.add_argument('--ext')
     parser.add_argument('--stats', action='store_true')
     parser.add_argument('--overviews', action='store_true')
-    parser.add_argument('-r', '--overview_resampling_method', choices=[RESAMPLING_CHOICES])
+    parser.add_argument('-r', '--overview_resampling_method', choices=RESAMPLING_CHOICES)
     parser.add_argument('--tiles', action='store_true')
     parser.add_argument('--out_tiles_dir',
                         help='Path to write tiled rasters to - cannot be created in place.')
