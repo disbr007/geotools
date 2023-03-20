@@ -6,8 +6,9 @@ geos
 geotiff
 numpy
 pandas
-rasterio==1.3b1
+rasterio #==1.3b1
 rtree
 scipy
 setuptools
 shapely
+sqlalchemy<2.0
