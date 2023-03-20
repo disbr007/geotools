@@ -586,12 +586,12 @@ def esri2gdf(features):
         except ValueError as e:
             # Try using modified esritools.create_multipolyon
             try:
-                logger.debug('Issue creating geometry, attempting fixed function...')
+                logger.debug(f'Issue creating geometry, attempting fixed function...\n{e}')
                 geometry = fixed_create_multipolygon(f['geometry'])
                 attributes.update({'geometry': geometry})
                 rows.append(attributes)
             except Exception as e:
-                logger.error('Error creating geometry, skipping feature: {e}')
+                logger.error(f'Error creating geometry, skipping feature: {e}')
                 skipped_rows += 1
             # raise e
     if skipped_rows > 0:
@@ -627,6 +627,8 @@ def create_gdf_from_features(features: dict, epsg: int,
         drop_cols:
             Optional list of columns to drop before
             writing to file.
+        features_format:
+            What format the features are in: JSON or geoJSON
     Returns:
         gpd.GeoDataFrame
     """
