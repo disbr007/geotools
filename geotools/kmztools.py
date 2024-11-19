@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Dict, Generator, List, Tuple, Union
 import zipfile
 
-from fastkml import kml, Folder, Placemark, LineStyle, PolyStyle, Document
-import fastkml
+from fastkml import kml, ExtendedData, Folder, Placemark, LineStyle, PolyStyle, Document, Style
 import pandas as pd
 import geopandas as gpd
 import shapely.ops
@@ -24,7 +23,7 @@ def _to_2d(x: float, y: float, z: float) -> tuple:
     return tuple(filter(None, [x, y]))
 
 
-def loop_features(element: Union[kml.Document, kml.Placemark, kml.Folder],
+def loop_features(element: Union[Document, Placemark, Folder],
                   folder_path: str) -> Generator:
     logger.debug(f'Iterating features in folder: {folder_path}')
     features = element.features()
@@ -43,7 +42,7 @@ def loop_features(element: Union[kml.Document, kml.Placemark, kml.Folder],
                 yield item
 
 
-def get_style_obj(style: kml.Style) -> dict:
+def get_style_obj(style: Style) -> dict:
     # logger.debug('Havestyle', style)
     obj = {}
     if hasattr(style, 'styles'):
@@ -122,7 +121,7 @@ def load_placemarks(kml_obj: kml.KML) -> Tuple[List[Dict], Dict]:
     return items, styles
 
 
-def attributes_from_extended_data(extended_data: kml.ExtendedData) -> dict:
+def attributes_from_extended_data(extended_data: ExtendedData) -> dict:
     attributes = {}
     for element in extended_data.elements:
         for d in element.data:
@@ -177,7 +176,7 @@ def attributes_from_description(description: str) -> dict:
     return attributes
 
 
-def create_record(placemark: kml.Placemark) -> dict:
+def create_record(placemark: Placemark) -> dict:
     geo = shapely.ops.transform(_to_2d, placemark.geometry)
 
     record = {
@@ -200,7 +199,7 @@ def create_record(placemark: kml.Placemark) -> dict:
     return record
 
 
-def capture_style(placemark: kml.Placemark, styles: dict) -> dict:
+def capture_style(placemark: Placemark, styles: dict) -> dict:
     style_url = placemark.styleUrl.replace('#', '')
     if style_url in styles.keys():
         # Style map, this should be handled better
