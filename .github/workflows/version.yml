@@ -1,18 +1,17 @@
+name: Release
+
 # Controls when the action will run. Triggers the workflow on push or pull request
 on:
   push:
     branches: [ main ]
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
-  # pull_request:
-  #   branches:
-  #     - '*'
 
 jobs:
-  deploy_version:
+  create_release:
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
     timeout-minutes: 5
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -34,18 +33,5 @@ jobs:
             body_path: RELEASE_NOTES.md
             draft: false
             prerelease: false
-      - name: Update version
-        run: |
-          sed -i -e 's/version:.*/version: ${{ env.GITHUB_REF_SLUG }}/g' env.yml
-          cat env.yml
-      - name: Commit version change
-        run: |
-          git config --global user.name "${{ github.actor }}"
-          git add env.yml
-          git commit -m "update version"
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          force: true
+
         
