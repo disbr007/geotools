@@ -24,7 +24,7 @@ Currently the release process is relatively manual.
 `git tag`
 2. Update `geotools/version.py` with the new version.
 3. Push changes to `main`
-4. Create new tag with appropriate bump in patch, minor, or major number, matching `geotools.__init__`:
+4. Create new tag with appropriate bump in patch, minor, or major number, matching `geotools/version.py`:
 `git tag v0.1.2`
 5. Push tag to GitHub:
 `git push origin v0.1.2`
