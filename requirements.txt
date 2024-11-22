@@ -1,4 +1,4 @@
-fastkml
+fastkml>=1.0.0
 fiona
 gdal
 geoalchemy2
